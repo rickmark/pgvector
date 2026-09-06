@@ -1210,3 +1210,47 @@ CREATE OPERATOR CLASS sparsevec_l1_ops
 	OPERATOR 1 <+> (sparsevec, sparsevec) FOR ORDER BY float_ops,
 	FUNCTION 1 l1_distance(sparsevec, sparsevec),
 	FUNCTION 3 hnsw_sparsevec_support(internal);
+
+-- clustering functions
+
+CREATE FUNCTION vector_kmeans(vector[], integer, integer DEFAULT 20)
+	RETURNS TABLE(cluster_id integer, centroid vector)
+	AS 'MODULE_PATHNAME' LANGUAGE C IMMUTABLE STRICT PARALLEL SAFE;
+
+COMMENT ON FUNCTION vector_kmeans(vector[], integer, integer) IS 'k-means clustering';
+
+CREATE FUNCTION vector_kmeans_assign(vector[], vector[])
+	RETURNS integer[]
+	AS 'MODULE_PATHNAME' LANGUAGE C IMMUTABLE STRICT PARALLEL SAFE;
+
+COMMENT ON FUNCTION vector_kmeans_assign(vector[], vector[]) IS 'k-means assign vectors to nearest centroid';
+
+CREATE FUNCTION vector_dbscan(vector[], float8, integer)
+	RETURNS TABLE(item_index integer, cluster_id integer)
+	AS 'MODULE_PATHNAME' LANGUAGE C IMMUTABLE STRICT PARALLEL SAFE;
+
+COMMENT ON FUNCTION vector_dbscan(vector[], float8, integer) IS 'DBSCAN density-based clustering';
+
+CREATE FUNCTION spann_assign(vector, vector[], float8 DEFAULT 0.15, integer DEFAULT 4)
+	RETURNS integer[]
+	AS 'MODULE_PATHNAME' LANGUAGE C IMMUTABLE STRICT PARALLEL SAFE;
+
+COMMENT ON FUNCTION spann_assign(vector, vector[], float8, integer) IS 'SPANN multi-centroid posting assignment';
+
+CREATE FUNCTION spann_query(vector, vector[], integer DEFAULT 10)
+	RETURNS integer[]
+	AS 'MODULE_PATHNAME' LANGUAGE C IMMUTABLE STRICT PARALLEL SAFE;
+
+COMMENT ON FUNCTION spann_query(vector, vector[], integer) IS 'SPANN candidate re-ranking';
+
+CREATE FUNCTION vector_spectral_clustering(vector[], integer, integer DEFAULT 5, integer DEFAULT 2)
+	RETURNS TABLE(item_index integer, cluster_id integer, spectral_embedding vector)
+	AS 'MODULE_PATHNAME' LANGUAGE C IMMUTABLE STRICT PARALLEL SAFE;
+
+COMMENT ON FUNCTION vector_spectral_clustering(vector[], integer, integer, integer) IS 'spectral clustering with low-dimensional projections';
+
+CREATE FUNCTION vector_spectral_project(vector, vector[], vector[], integer DEFAULT 5)
+	RETURNS vector
+	AS 'MODULE_PATHNAME' LANGUAGE C IMMUTABLE STRICT PARALLEL SAFE;
+
+COMMENT ON FUNCTION vector_spectral_project(vector, vector[], vector[], integer) IS 'out-of-sample projection into spectral embedding space';

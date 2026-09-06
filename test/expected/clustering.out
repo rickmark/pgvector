@@ -1,0 +1,140 @@
+-- k-means clustering
+SELECT * FROM vector_kmeans(ARRAY['[1,2]'::vector, '[1,2.1]', '[10,10]', '[10,10.2]'], 2);
+ cluster_id | centroid  
+------------+-----------
+          0 | [1,2.05]
+          1 | [10,10.1]
+(2 rows)
+
+SELECT vector_kmeans_assign(ARRAY['[1,2]'::vector, '[10,10]', '[1,2.5]'], ARRAY['[1,2]'::vector, '[10,10]']);
+ vector_kmeans_assign 
+----------------------
+ {0,1,0}
+(1 row)
+
+-- k-means edge cases
+SELECT * FROM vector_kmeans(ARRAY['[1,2,3]'::vector], 1);
+ cluster_id | centroid 
+------------+----------
+          0 | [1,2,3]
+(1 row)
+
+SELECT * FROM vector_kmeans(ARRAY['[1,2]'::vector, '[3,4]'], 5);
+ cluster_id | centroid 
+------------+----------
+          0 | [1,2]
+          1 | [3,4]
+(2 rows)
+
+SELECT * FROM vector_kmeans(ARRAY[]::vector[], 2);
+ERROR:  vector array cannot be empty
+SELECT * FROM vector_kmeans(ARRAY['[1,2]'::vector, NULL], 2);
+ERROR:  array must not contain nulls
+SELECT * FROM vector_kmeans(ARRAY['[1,2]'::vector, '[1,2,3]'], 2);
+ERROR:  all vectors in array must have the same dimension: expected 2, got 3 at index 2
+SELECT * FROM vector_kmeans(ARRAY['[1,2]'::vector], 0);
+ERROR:  k must be greater than 0
+SELECT * FROM vector_kmeans(ARRAY['[1,2]'::vector], 1, 0);
+ERROR:  max_iter must be greater than 0
+-- DBSCAN clustering
+SELECT * FROM vector_dbscan(ARRAY['[1,2]'::vector, '[1,2.1]', '[10,10]', '[10,10.2]', '[100,100]'], 1.0, 2);
+ item_index | cluster_id 
+------------+------------
+          1 |          1
+          2 |          1
+          3 |          2
+          4 |          2
+          5 |         -1
+(5 rows)
+
+SELECT * FROM vector_dbscan(ARRAY['[0,0]'::vector, '[0,0.1]', '[0,0.2]', '[5,5]', '[5,5.1]'], 0.5, 2);
+ item_index | cluster_id 
+------------+------------
+          1 |          1
+          2 |          1
+          3 |          1
+          4 |          2
+          5 |          2
+(5 rows)
+
+-- DBSCAN edge cases
+SELECT * FROM vector_dbscan(ARRAY['[1,2]'::vector], 0.5, 1);
+ item_index | cluster_id 
+------------+------------
+          1 |          1
+(1 row)
+
+SELECT * FROM vector_dbscan(ARRAY['[1,2]'::vector], 0.0, 1);
+ERROR:  eps must be greater than 0
+SELECT * FROM vector_dbscan(ARRAY['[1,2]'::vector], 0.5, 0);
+ERROR:  min_samples must be greater than 0
+SELECT * FROM vector_dbscan(ARRAY[]::vector[], 0.5, 2);
+ERROR:  vector array cannot be empty
+-- SPANN assignment & candidate query
+SELECT spann_assign('[1,2]'::vector, ARRAY['[1,2]'::vector, '[1.1,2.1]', '[10,10]'], 0.2, 3);
+ spann_assign 
+--------------
+ {1}
+(1 row)
+
+SELECT spann_assign('[1,2]'::vector, ARRAY['[1,2]'::vector, '[1.1,2.1]', '[10,10]'], 0.01, 3);
+ spann_assign 
+--------------
+ {1}
+(1 row)
+
+SELECT spann_query('[1,2]'::vector, ARRAY['[10,10]'::vector, '[1,2.1]', '[1,2]'], 2);
+ spann_query 
+-------------
+ {3,2}
+(1 row)
+
+SELECT spann_query('[1,2]'::vector, ARRAY['[10,10]'::vector, '[1,2.1]', '[1,2]'], 10);
+ spann_query 
+-------------
+ {3,2,1}
+(1 row)
+
+-- SPANN edge cases
+SELECT spann_assign('[1,2]'::vector, ARRAY['[1,2,3]'::vector], 0.15, 2);
+ERROR:  vector dimensions do not match: 2 and 3
+SELECT spann_assign('[1,2]'::vector, ARRAY['[1,2]'::vector], -0.1, 2);
+ERROR:  alpha must be non-negative
+SELECT spann_assign('[1,2]'::vector, ARRAY['[1,2]'::vector], 0.15, 0);
+ERROR:  max_centroids must be greater than 0
+SELECT spann_assign('[1,2]'::vector, ARRAY[]::vector[], 0.15, 2);
+ERROR:  centroids array cannot be empty
+-- Spectral clustering
+SELECT item_index, cluster_id, vector_dims(spectral_embedding) AS proj_dims
+FROM vector_spectral_clustering(ARRAY['[1,2]'::vector, '[1,2.1]', '[10,10]', '[10,10.2]'], 2, 2, 2);
+ item_index | cluster_id | proj_dims 
+------------+------------+-----------
+          1 |          0 |         2
+          2 |          0 |         2
+          3 |          1 |         2
+          4 |          1 |         2
+(4 rows)
+
+-- Spectral project (out of sample)
+SELECT vector_spectral_project(
+    '[1,2.05]'::vector,
+    ARRAY['[1,2]'::vector, '[1,2.1]', '[10,10]', '[10,10.2]'],
+    ARRAY['[1,0]'::vector, '[1,0]', '[0,1]', '[0,1]'],
+    2
+);
+ vector_spectral_project 
+-------------------------
+ [1,0]
+(1 row)
+
+-- Spectral edge cases
+SELECT * FROM vector_spectral_clustering(ARRAY['[1,2]'::vector], 0, 1, 1);
+ERROR:  k_clusters must be greater than 0
+SELECT * FROM vector_spectral_clustering(ARRAY['[1,2]'::vector], 1, 0, 1);
+ERROR:  n_neighbors must be greater than 0
+SELECT * FROM vector_spectral_clustering(ARRAY['[1,2]'::vector], 1, 1, 0);
+ERROR:  n_components must be greater than 0
+SELECT vector_spectral_project('[1,2]'::vector, ARRAY['[1,2]'::vector], ARRAY['[1,0]'::vector, '[0,1]'], 1);
+ERROR:  samples and projections arrays must have equal length (1 vs 2)
+SELECT vector_spectral_project('[1,2,3]'::vector, ARRAY['[1,2]'::vector], ARRAY['[1,0]'::vector], 1);
+ERROR:  query vector dimension (3) does not match sample vector dimension (2)
